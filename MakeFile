@@ -1,69 +1,131 @@
-# 定义目标文件名和源文件路径
-BOOT_TARGET = boot
-SETUP_TARGET = setup
-BOOT_SRC = ./boot/$(BOOT_TARGET).asm
-SETUP_SRC = ./boot/$(SETUP_TARGET).asm
-BUILDPATH = ./build
+# 目标文件名和源文件路径定义
+BOOT_TARGET   = boot
+SETUP_TARGET  = setup
 
-# 输出文件
-BOOT_BIN = $(BUILDPATH)/$(BOOT_TARGET).bin
-SETUP_BIN = $(BUILDPATH)/$(SETUP_TARGET).bin
-DISK_IMG = $(BUILDPATH)/disk.img  # 统一的磁盘镜像文件名
+BOOT_SRC      = ./boot/$(BOOT_TARGET).asm
+SETUP_SRC     = ./boot/$(SETUP_TARGET).asm
+KERNEL_SRC    = ./boot/head.asm
 
-# 定义工具
-NASM = nasm
-QEMU = qemu-system-x86_64
-DD = dd
+BUILDPATH     = ./build
 
-# 默认目标：编译并运行
+
+# 输出文件定义
+BOOT_BIN      = $(BUILDPATH)/$(BOOT_TARGET).bin
+SETUP_BIN     = $(BUILDPATH)/$(SETUP_TARGET).bin
+SYSTEM_BIN    = $(BUILDPATH)/system.bin
+KERNEL_O      = $(BUILDPATH)/kernel.o
+KERNEL_BIN    = $(BUILDPATH)/kernel.bin
+DISK_IMG      = $(BUILDPATH)/disk.img  # 统一的磁盘镜像文件名
+
+
+# 工具定义
+NASM          = nasm
+QEMU          = qemu-system-x86_64
+DD            = dd
+
+
+# 编译选项
+CFLAGS        := -m32
+CFLAGS        += -masm=intel
+CFLAGS        += -fno-builtin
+CFLAGS        += -nostdinc
+CFLAGS        += -fno-pic
+CFLAGS        += -fno-pie
+CFLAGS        += -nostdlib
+CFLAGS        += -fno-stack-protector
+CFLAGS        := $(strip ${CFLAGS})
+
+DEBUG         := -g
+
+
+# 主要目标
 all: run
 
-# 确保build目录存在
+# 目录创建
 $(BUILDPATH):
 	mkdir -p $(BUILDPATH)
 	@echo "创建build目录: $(BUILDPATH)"
 
-# 汇编生成引导程序二进制文件
+
+# 汇编目标
 $(BOOT_BIN): $(BOOT_SRC) | $(BUILDPATH)
 	$(NASM) -f bin $(BOOT_SRC) -o $(BOOT_BIN)
 	@echo "引导程序汇编完成: $(BOOT_BIN)"
 
-# 汇编生成setup程序二进制文件
 $(SETUP_BIN): $(SETUP_SRC) | $(BUILDPATH)
 	$(NASM) -f bin $(SETUP_SRC) -o $(SETUP_BIN)
 	@echo "Setup程序汇编完成: $(SETUP_BIN)"
 
-# 创建磁盘镜像并写入两个程序
-$(DISK_IMG): $(BOOT_BIN) $(SETUP_BIN)
+$(KERNEL_O): $(KERNEL_SRC) | $(BUILDPATH)
+	$(NASM) -f elf32 -g $(KERNEL_SRC) -o $(KERNEL_O)
+	@echo "KERNEL_O程序汇编完成: $(KERNEL_O)"
+
+
+# 内核编译
+$(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o | $(BUILDPATH)
+	ld -m elf_i386 $^ -o $(KERNEL_BIN)
+
+${BUILDPATH}/init/main.o: ./init/main.c
+	mkdir -p ${BUILDPATH}/init/
+	gcc ${CFLAGS} ${DEBUG} -c $< -o $@
+
+
+# 系统二进制文件
+$(SYSTEM_BIN): $(KERNEL_BIN) ${BUILDPATH}/init/main.o | $(BUILDPATH)
+	objcopy -O binary $(KERNEL_BIN) $(SYSTEM_BIN)
+
+
+# 磁盘镜像生成
+$(DISK_IMG): $(BOOT_BIN) $(SETUP_BIN) $(SYSTEM_BIN)
 	$(shell rm -rf $(DISK_IMG))
-	# 创建10MB空镜像
-	#$(DD) if=/dev/zero of=$(DISK_IMG) bs=1M count=10 status=none
+	# 创建16MB磁盘镜像
 	bximage -q -hd=16 -func=create -sectsize=512 -imgmode=flat $(DISK_IMG)
 	# 写入引导扇区(第一个扇区)
 	$(DD) if=$(BOOT_BIN) of=$(DISK_IMG) bs=512 seek=0 count=1 conv=notrunc
 	# 写入setup程序(第二个扇区)
 	$(DD) if=$(SETUP_BIN) of=$(DISK_IMG) bs=512 seek=1 conv=notrunc
+	# 写入内核
+	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=2 conv=notrunc
 	@echo "磁盘镜像创建完成: $(DISK_IMG)"
 
-# 运行模拟器
+
+# 运行目标
+LOCK_FILE := $(BUILDPATH)/disk.img.lock # 锁文件路径（自动关联镜像名）
+
 run_qume: $(DISK_IMG)
+# 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
+	@if [ -f $(LOCK_FILE) ]; then \
+		echo "删除残留锁文件: $(LOCK_FILE)"; \
+		rm -f $(LOCK_FILE); \
+	else \
+		echo "未发现锁文件，无需删除"; \
+	fi
 	@echo "启动QEMU模拟器..."
-	$(QEMU) -m 32M -hda $(DISK_IMG)  # 使用硬盘模式而不是软盘模式
+	$(QEMU) -m 32M -hda $(DISK_IMG)  # 使用硬盘模式
 
 run_bochs: $(DISK_IMG)
+# 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
+	@if [ -f $(LOCK_FILE) ]; then \
+		echo "删除残留锁文件: $(LOCK_FILE)"; \
+		rm -f $(LOCK_FILE); \
+	else \
+		echo "未发现锁文件，无需删除"; \
+	fi
+
 	@echo "启动bochs模拟器..."
-	~/bochs-2.7/bochs -q -f boch.config  # 使用硬盘模式而不是软盘模式
+	~/bochs-2.7/bochs -q -f boch.config  # 使用硬盘模式
 
-# 单独编译引导程序
+
+# 单独编译目标
 boot: $(BOOT_BIN)
-
-# 单独编译setup程序
 setup: $(SETUP_BIN)
 
-# 清理生成的文件
+
+# 清理目标
 clean:
 	rm -rf $(BUILDPATH)
 	@echo "清理完成"
 
-# 伪目标
+
+# 伪目标声明
 .PHONY: all run clean boot setup

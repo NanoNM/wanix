@@ -3,4 +3,4 @@ project(helloworld C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(helloworld main.c)
+add_executable(helloworld init/main.c)
