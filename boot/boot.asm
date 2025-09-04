@@ -1,6 +1,6 @@
 [ORG 0x7C00]
 [BITS 16]
-
+; xchg bx,bx
 _start:
     ; 设置视频模式
     mov ax, 3
@@ -13,7 +13,7 @@ _start:
 
     ; 设置读取参数：LBA=1，读取2个扇区
     mov ecx, 1    ; LBA扇区号=1
-    mov bl, 2       ; 读取2个扇区
+    mov bl,1       ; 读取2个扇区
 
     call .lba_read  ; 调用LBA读取函数
     jmp 0x5C00      ; 跳转到加载的setup代码执行（修改此处）
@@ -70,7 +70,7 @@ _start:
 
     ; 8. 读取数据到内存(示例：0x5C00)
     mov di, 0x5C00  ; 目标内存地址
-    mov cx, 512/2 * 2 ; 2个扇区(每个扇区512字节，每次读2字节)
+    mov cx, 512/2 * 1 ; 2个扇区(每个扇区512字节，每次读2字节)
     mov dx, 0x1F0   ; 数据端口
     rep insw        ; 批量读取数据
     popa
