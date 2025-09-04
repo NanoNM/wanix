@@ -20,22 +20,22 @@ DISK_IMG      = $(BUILDPATH)/disk.img  # 统一的磁盘镜像文件名
 
 # 工具定义
 NASM          = nasm
-QEMU          = qemu-system-x86_64
+QEMU          = qemu-system-i386
 DD            = dd
 
 
 # 编译选项
-CFLAGS        := -m32
-CFLAGS        += -masm=intel
-CFLAGS        += -fno-builtin
-CFLAGS        += -nostdinc
-CFLAGS        += -fno-pic
-CFLAGS        += -fno-pie
-CFLAGS        += -nostdlib
-CFLAGS        += -fno-stack-protector
-CFLAGS        := $(strip ${CFLAGS})
+CFLAGS:= -m32 # 32 位的程序
+CFLAGS+= -masm=intel
+CFLAGS+= -fno-builtin	# 不需要 gcc 内置函数
+CFLAGS+= -nostdinc		# 不需要标准头文件
+CFLAGS+= -fno-pic		# 不需要位置无关的代码  position independent code
+CFLAGS+= -fno-pie		# 不需要位置无关的可执行程序 position independent executable
+CFLAGS+= -nostdlib		# 不需要标准库
+CFLAGS+= -fno-stack-protector	# 不需要栈保护
+CFLAGS:=$(strip ${CFLAGS})
 
-DEBUG         := -g
+DEBUG:= -g
 
 
 # 主要目标
@@ -57,22 +57,23 @@ $(SETUP_BIN): $(SETUP_SRC) | $(BUILDPATH)
 	@echo "Setup程序汇编完成: $(SETUP_BIN)"
 
 $(KERNEL_O): $(KERNEL_SRC) | $(BUILDPATH)
-	$(NASM) -f elf32 -g $(KERNEL_SRC) -o $(KERNEL_O)
+	$(NASM)  -f elf32 -g  $(KERNEL_SRC) -o $(KERNEL_O)
 	@echo "KERNEL_O程序汇编完成: $(KERNEL_O)"
 
 
 # 内核编译
 $(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o | $(BUILDPATH)
-	ld -m elf_i386 $^ -o $(KERNEL_BIN)
+	ld -m elf_i386 -g $^ -o  $(KERNEL_BIN) -Ttext 0x1200
 
 ${BUILDPATH}/init/main.o: ./init/main.c
 	mkdir -p ${BUILDPATH}/init/
-	gcc ${CFLAGS} ${DEBUG} -c $< -o $@
+	gcc ${CFLAGS} -g -c $< -o $@
 
 
-# 系统二进制文件
+# 系统二进制文件 将仅代码 拷贝到SYSTEM_BIN
 $(SYSTEM_BIN): $(KERNEL_BIN) ${BUILDPATH}/init/main.o | $(BUILDPATH)
 	objcopy -O binary $(KERNEL_BIN) $(SYSTEM_BIN)
+	nm $(KERNEL_BIN) | sort > ${BUILDPATH}/system.map
 
 
 # 磁盘镜像生成
@@ -83,14 +84,18 @@ $(DISK_IMG): $(BOOT_BIN) $(SETUP_BIN) $(SYSTEM_BIN)
 	# 写入引导扇区(第一个扇区)
 	$(DD) if=$(BOOT_BIN) of=$(DISK_IMG) bs=512 seek=0 count=1 conv=notrunc
 	# 写入setup程序(第二个扇区)
-	$(DD) if=$(SETUP_BIN) of=$(DISK_IMG) bs=512 seek=1 conv=notrunc
+	$(DD) if=$(SETUP_BIN) of=$(DISK_IMG) bs=512 seek=1 count=2 conv=notrunc
 	# 写入内核
-	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=2 conv=notrunc
+	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=2 count=60 conv=notrunc
 	@echo "磁盘镜像创建完成: $(DISK_IMG)"
 
 
 # 运行目标
 LOCK_FILE := $(BUILDPATH)/disk.img.lock # 锁文件路径（自动关联镜像名）
+
+qemu-gdb: $(DISK_IMG)
+	$(QEMU) -m 32M -hda $(DISK_IMG) -S -gdb tcp::1234
+	@echo "QEMU started in background, waiting for GDB on :1234"
 
 run_qume: $(DISK_IMG)
 # 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
@@ -125,6 +130,7 @@ setup: $(SETUP_BIN)
 clean:
 	rm -rf $(BUILDPATH)
 	@echo "清理完成"
+
 
 
 # 伪目标声明
