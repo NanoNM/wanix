@@ -14,10 +14,8 @@ _start:
     ; 设置读取参数：LBA=1，读取2个扇区
     mov ecx, 1    ; LBA扇区号=1
     mov bl, 2       ; 读取2个扇区
-        xchg bx, bx
-        xchg bx, bx
-    call .lba_read  ; 调用LBA读取函数
 
+    call .lba_read  ; 调用LBA读取函数
     jmp 0x5C00      ; 跳转到加载的setup代码执行（修改此处）
 
 ; --------------------------
@@ -108,6 +106,6 @@ _start:
     ret
 
 ; 数据区
-MSG_LOAD db "Loading sectors...", 13, 10, 0
+MSG_LOAD db "Loading setup...", 13, 10, 0
 times 510 - ($ - $$) db 0
 dw 0xAA55

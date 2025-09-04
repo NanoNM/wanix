@@ -48,7 +48,7 @@ $(DISK_IMG): $(BOOT_BIN) $(SETUP_BIN)
 # 运行模拟器
 run_qume: $(DISK_IMG)
 	@echo "启动QEMU模拟器..."
-	$(QEMU) -hda $(DISK_IMG)  # 使用硬盘模式而不是软盘模式
+	$(QEMU) -m 32M -hda $(DISK_IMG)  # 使用硬盘模式而不是软盘模式
 
 run_bochs: $(DISK_IMG)
 	@echo "启动bochs模拟器..."
