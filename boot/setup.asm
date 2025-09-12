@@ -2,13 +2,14 @@
 ; setup.asm - 16位实模式下的系统初始化程序（加载内核、检测内存、进入保护模式）
 ; 程序加载地址：0x5C00（由引导程序 boot.asm 指定）
 ; ==============================================================================
-[ORG 0x5C00]   ; 程序被读取到内存 0x5C00 处执行
+[ORG 0x500]   ; 程序被读取到内存 0x5C00 处执行
 [BITS 16]      ; 明确指定 16位实模式
 
 ; ==============================================================================
 ; 1. 数据段：定义常量、内存检测缓冲区、GDT 表
 ; ==============================================================================
 [SECTION .setup_data]
+KERNEL_ADDR equ 0x7c00
 ; --------------------------
 ; 内存检测相关常量/变量
 ; --------------------------
@@ -59,7 +60,7 @@ gdt_pointer:
 ; 字符串常量（打印用）
 ; --------------------------
 msg:
-    db "Hello world. setup load success. loading to protected mode", 10, 13, 0  
+    db "Hello world. setup load success. loading to protected mode", 10, 13, 0
     ; 10=换行符（LF），13=回车符（CR），0=字符串结束符（NULL）
 
 MEM_CHEAK_ERROR:
@@ -99,6 +100,21 @@ setup_start:
     call mem_cheak          ; 内存检测（获取内存布局）
     mov si, SETUP_BOOT_INTO_KERNEL
     call print
+; 步骤1：关闭中断（防止切换过程中被中断打断）
+    cli
+
+    ; 步骤2：加载 GDT 表（LGDT 指令：将 GDT 描述符加载到 GDTR 寄存器）
+    lgdt [gdt_pointer]
+
+    ; 步骤3：开启 A20 地址线（支持 1MB 以上内存访问）
+    in al, 0x92        ; 读取 0x92 端口（系统控制端口）
+    or al, 00000010b   ; 置第1位为1（开启 A20 地址线）
+    out 0x92, al       ; 写回端口
+
+    ; 步骤5：置 CR0 寄存器 PE 位（第0位），进入保护模式
+    mov eax, cr0
+    or eax, 1          ; PE 位 = 1（Protection Enable，保护模式使能）
+    mov cr0, eax
 
     call enter_protected_mod; 准备并进入32位保护模式
 
@@ -154,34 +170,13 @@ mem_cheak:
 ; 功能：完成实模式到保护模式的切换，并读取内核到内存
 ; ==============================================================================
 enter_protected_mod:
-    ; 步骤1：关闭中断（防止切换过程中被中断打断）
-    cli
-
-    ; 步骤2：加载 GDT 表（LGDT 指令：将 GDT 描述符加载到 GDTR 寄存器）
-    lgdt [gdt_pointer]
-
-    ; 步骤3：开启 A20 地址线（支持 1MB 以上内存访问）
-    in al, 0x92        ; 读取 0x92 端口（系统控制端口）
-    or al, 00000010b   ; 置第1位为1（开启 A20 地址线）
-    out 0x92, al       ; 写回端口
-
-    ; 步骤4：读取内核到内存（LBA 模式读硬盘，扇区1开始，读3个扇区到 0x1200）
-    mov ecx, 2         ; LBA 扇区号 = 1（内核存储起始扇区）
-    mov bl, 1          ; 读取扇区数 = 3（内核大小对应3个扇区）
+    mov edi, KERNEL_ADDR
+    mov ecx, 3         ; LBA 扇区号 = 2（内核存储起始扇区）
+    mov bl, 100         ; 读取扇区数 = 100（内核大小对应100个扇区）
     call .lba_read     ; 调用 LBA 读硬盘函数
 
-    ; 步骤5：置 CR0 寄存器 PE 位（第0位），进入保护模式
-    mov eax, cr0
-    or eax, 1          ; PE 位 = 1（Protection Enable，保护模式使能）
-    mov cr0, eax
-
-    ; （注：原始代码中此跳转被注释，若需直接进入保护模式可启用）
-    ; jmp GDT_CODE_SEGMENT:protected_mode  ; 远跳，加载 CS 为代码段选择子
-          ; 跳转到内核代码执行（0x1200 为内核加载地址）
-              xchg bx,bx
-              xchg bx,bx
-    jmp GDT_CODE_SEGMENT:0x1200
-
+    ;跳转到载入位置
+    jmp GDT_CODE_SEGMENT:KERNEL_ADDR
     jmp $  ; 死循环（备用，防止跳转失败）
 
 
@@ -192,7 +187,6 @@ enter_protected_mod:
 ; 输出：扇区数据写入到 0x1200 起始地址
 ; ==============================================================================
 .lba_read:
-    pusha  ; 保存所有通用寄存器（防止破坏主程序寄存器值）
 
     ; 1. 设置读取扇区数（IDE 端口 0x1F2）
     mov dx, 0x1F2    ; 0x1F2 = 扇区计数寄存器
@@ -230,16 +224,32 @@ enter_protected_mod:
     call .wait_ready
 
     ; 8. 读取数据到内存（目标地址 0x1200，每次读2字节）
-    mov di, 0x1200   ; DI = 目标内存地址（内核加载地址）
-    mov cx, 512/2 * 1; CX = 读取次数（3扇区 × 512字节/扇区 ÷ 2字节/次）
+    mov di, KERNEL_ADDR   ; DI = 目标内存地址（内核加载地址）
+
+    mov cl, bl
+    xchg bx,bx
+    xchg bx,bx
+
+.start_read:
+    push cx
+    call .wait_ready
+    call .read_hd
+    pop cx
+    loop .start_read
+.return:
+    ret
+
+.read_hd:
+    mov cx, 256
     mov dx, 0x1F0    ; 0x1F0 = 数据端口（双向）
 
-    rep insw         ; 批量读取：每次从 DX 读2字节到 ES:DI，CX--，直到 CX=0
+.read_word:
+    in ax, dx
+    mov [edi], ax
+    add edi, 2
+    loop .read_word
 
-
-    popa  ; 恢复所有通用寄存器
-    ret   ; 返回调用者
-
+    ret
 
 ; ==============================================================================
 ; 子函数4：等待硬盘就绪（辅助 .lba_read 函数）

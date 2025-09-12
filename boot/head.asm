@@ -11,6 +11,9 @@ _start:
 ;-----------------------
 ;初始化栈 跳转到c代码
 ;-----------------------
+    xchg bx,bx
+    xchg bx,bx
+
     call k32_entry
     ;mov ax,(2 << 3)
     ;mov ds,ax
