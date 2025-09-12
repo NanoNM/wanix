@@ -63,10 +63,10 @@ $(KERNEL_O): $(KERNEL_SRC)  | $(BUILDPATH)
 
 
 # 内核编译
-$(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/printfk.o  ${BUILDPATH}/kernel/asm/io.o \
+$(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/printk.o  ${BUILDPATH}/kernel/asm/io.o \
 	${BUILDPATH}/kernel/vfprintf.o\
 	${BUILDPATH}/lib/string.o  ${BUILDPATH}/lib/stdio.o  ${BUILDPATH}/lib/stdlib.o ${BUILDPATH}/lib/unistd.o ${BUILDPATH}/lib/write.o  ${BUILDPATH}/lib/error.o        | $(BUILDPATH)
-	ld -m elf_i386 -g $^ -o  $(KERNEL_BIN) -Ttext 0x1200
+	ld -m elf_i386 -g $^ -o  $(KERNEL_BIN) -Ttext 0x7000
 
 
 ${BUILDPATH}/kernel/chr_drv/%.o:./kernel/chr_drv/%.c
@@ -117,14 +117,14 @@ $(DISK_IMG): $(BOOT_BIN) $(SETUP_BIN) $(SYSTEM_BIN)
 # 运行目标
 LOCK_FILE := $(BUILDPATH)/disk.img.lock # 锁文件路径（自动关联镜像名）
 
-run_qemug: $(DISK_IMG)
+run_qemug:clean $(DISK_IMG)
 	$(QEMU) \
     	-m 32M \
     	-boot c \
     	-hda $(DISK_IMG) \
     	-s -S
 
-run_qume: $(DISK_IMG)
+run_qume:clean $(DISK_IMG)
 # 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
 	@if [ -f $(LOCK_FILE) ]; then \
 		echo "删除残留锁文件: $(LOCK_FILE)"; \
@@ -135,7 +135,7 @@ run_qume: $(DISK_IMG)
 	@echo "启动QEMU模拟器..."
 	$(QEMU) -m 32M -hda $(DISK_IMG)  # 使用硬盘模式
 
-run_bochs: $(DISK_IMG)
+run_bochs: clean $(DISK_IMG)
 # 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
 	@if [ -f $(LOCK_FILE) ]; then \
 		echo "删除残留锁文件: $(LOCK_FILE)"; \
@@ -159,6 +159,10 @@ clean:
 	@echo "清理完成"
 
 
+# 生成的内核镜像给VBox、VMware用
+vmdk: $(BUILDPATH)/master.vmdk
 
+$(BUILDPATH)/master.vmdk: ./build/disk.img
+	qemu-img convert -O vmdk $< $@
 # 伪目标声明
 .PHONY: all run clean boot setup

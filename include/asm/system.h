@@ -11,8 +11,11 @@
 
 #define BOCHS_DEBUG_MAGIC   __asm__("xchg bx, bx");
 
-#define STI   __asm__("sti");
-#define CLI   __asm__("cli");
+//TODO 暂时没有中断向量表暂时不需要开关中断
+// #define STI   __asm__("sti");
+#define STI   __asm__("");
+// #define CLI   __asm__("cli");
+#define CLI   __asm__("");
 
 typedef enum {
     rc_black = 0,
