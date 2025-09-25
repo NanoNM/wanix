@@ -66,7 +66,7 @@ $(KERNEL_O): $(KERNEL_SRC)  | $(BUILDPATH)
 $(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/printk.o  ${BUILDPATH}/kernel/asm/io.o \
 	${BUILDPATH}/kernel/vfprintf.o\
 	${BUILDPATH}/lib/string.o  ${BUILDPATH}/lib/stdio.o  ${BUILDPATH}/lib/stdlib.o ${BUILDPATH}/lib/unistd.o ${BUILDPATH}/lib/write.o  ${BUILDPATH}/lib/error.o        | $(BUILDPATH)
-	ld -m elf_i386 -g $^ -o  $(KERNEL_BIN) -Ttext 0x7000
+	ld -m elf_i386 -g $^ -o $(KERNEL_BIN) -Ttext 0x1200
 
 
 ${BUILDPATH}/kernel/chr_drv/%.o:./kernel/chr_drv/%.c
@@ -104,13 +104,13 @@ $(SYSTEM_BIN): $(KERNEL_BIN) | $(BUILDPATH)
 $(DISK_IMG): $(BOOT_BIN) $(SETUP_BIN) $(SYSTEM_BIN)
 	$(shell rm -rf $(DISK_IMG))
 	# 创建16MB磁盘镜像
-	bximage -q -hd=16 -func=create -sectsize=512 -imgmode=flat $(DISK_IMG)
+	bximage -q -hd=64 -func=create -sectsize=512 -imgmode=flat $(DISK_IMG)
 	# 写入引导扇区(第一个扇区)
 	$(DD) if=$(BOOT_BIN) of=$(DISK_IMG) bs=512 seek=0 count=1 conv=notrunc
 	# 写入setup程序(第二个扇区)
 	$(DD) if=$(SETUP_BIN) of=$(DISK_IMG) bs=512 seek=1 count=2 conv=notrunc
 	# 写入内核
-	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=3 count=100 conv=notrunc
+	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=3 count=60 conv=notrunc
 	@echo "磁盘镜像创建完成: $(DISK_IMG)"
 
 
@@ -119,7 +119,7 @@ LOCK_FILE := $(BUILDPATH)/disk.img.lock # 锁文件路径（自动关联镜像�
 
 run_qemug:clean $(DISK_IMG)
 	$(QEMU) \
-    	-m 32M \
+    	-m 128M \
     	-boot c \
     	-hda $(DISK_IMG) \
     	-s -S
@@ -133,7 +133,7 @@ run_qume:clean $(DISK_IMG)
 		echo "未发现锁文件，无需删除"; \
 	fi
 	@echo "启动QEMU模拟器..."
-	$(QEMU) -m 32M -hda $(DISK_IMG)  # 使用硬盘模式
+	$(QEMU) -m 64M -hda $(DISK_IMG)  -net nic,model=ne2k_pci  # 使用硬盘模式
 
 run_bochs: clean $(DISK_IMG)
 # 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
@@ -147,6 +147,17 @@ run_bochs: clean $(DISK_IMG)
 	@echo "启动bochs模拟器..."
 	~/bochs-2.7/bochs -q -f boch.config  # 使用硬盘模式
 
+run_bochs_ng: clean $(DISK_IMG)
+# 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
+	@if [ -f $(LOCK_FILE) ]; then \
+		echo "删除残留锁文件: $(LOCK_FILE)"; \
+		rm -f $(LOCK_FILE); \
+	else \
+		echo "未发现锁文件，无需删除"; \
+	fi
+
+	@echo "启动bochs模拟器..."
+	~/bochs-2.7/bochs -q -f bochng.config  # 使用硬盘模式
 
 # 单独编译目标
 boot: $(BOOT_BIN)

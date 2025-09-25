@@ -49,5 +49,4 @@ _start:
     ; 调用c程序
 .enter_c_word:
     call k32_entry
-
     jmp $

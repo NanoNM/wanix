@@ -9,7 +9,7 @@
 ; 1. 数据段：定义常量、内存检测缓冲区、GDT 表
 ; ==============================================================================
 [SECTION .setup_data]
-KERNEL_ADDR equ 0x7000
+KERNEL_ADDR equ 0x1200
 ; --------------------------
 ; 内存检测相关常量/变量
 ; --------------------------
@@ -100,9 +100,10 @@ setup_start:
     call mem_cheak          ; 内存检测（获取内存布局）
     mov si, SETUP_BOOT_INTO_KERNEL
     call print
-; 步骤1：关闭中断（防止切换过程中被中断打断）
-    cli
 
+    ; 进入保护模式
+    ; 步骤1：关闭中断（防止切换过程中被中断打断）
+    cli
     ; 步骤2：加载 GDT 表（LGDT 指令：将 GDT 描述符加载到 GDTR 寄存器）
     lgdt [gdt_pointer]
 
@@ -111,13 +112,15 @@ setup_start:
     or al, 00000010b   ; 置第1位为1（开启 A20 地址线）
     out 0x92, al       ; 写回端口
 
-    ; 步骤5：置 CR0 寄存器 PE 位（第0位），进入保护模式
+    ; 步骤5：置 CR0 寄存器 PE 位（第0位），进入16位保护模式
     mov eax, cr0
     or eax, 1          ; PE 位 = 1（Protection Enable，保护模式使能）
     mov cr0, eax
+    XCHG BX, BX
+    XCHG BX, BX
 
-    call enter_protected_mod; 准备并进入32位保护模式
-
+    ; 进入32位保护模式 不用显式将代码段复制给cs
+    call GDT_CODE_SEGMENT:enter_protected_mod
 
     jmp $  ; 死循环（防止程序意外跑飞）
 
@@ -169,10 +172,19 @@ mem_cheak:
 ; 子函数2：进入32位保护模式（核心步骤：关中断、加载GDT、开A20、置CR0位）
 ; 功能：完成实模式到保护模式的切换，并读取内核到内存
 ; ==============================================================================
+[BITS 32]
 enter_protected_mod:
+    mov ax, GDT_DATA_SEGMENT
+    mov ds, ax
+    mov ss, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+
+    mov esp, 0x9fbff
     mov edi, KERNEL_ADDR
     mov ecx, 3         ; LBA 扇区号 = 2（内核存储起始扇区）
-    mov bl, 100         ; 读取扇区数 = 100（内核大小对应100个扇区）
+    mov bl, 60         ; 读取扇区数 = 100（内核大小对应100个扇区）
     call .lba_read     ; 调用 LBA 读硬盘函数
 
     ;跳转到载入位置
@@ -187,87 +199,95 @@ enter_protected_mod:
 ; 输出：扇区数据写入到 0x1200 起始地址
 ; ==============================================================================
 .lba_read:
+    ; --------------------------
+    ; 1. 写入扇区计数（IDE 端口 0x1F2）
+    ; --------------------------
+    mov dx, 0x1F2    ; 0x1F2 = 扇区计数寄存器（指定要读取的扇区数量）
+    mov al, bl       ; AL = 读取扇区数（BL 传入，此处为1）
+    out dx, al       ; 输出到端口（告知硬盘要读多少个扇区）
 
-    ; 1. 设置读取扇区数（IDE 端口 0x1F2）
-    mov dx, 0x1F2    ; 0x1F2 = 扇区计数寄存器
-    mov al, bl       ; AL = 读取扇区数（BL 传入）
-    out dx, al       ; 写端口
-
-    ; 2. 设置 LBA 扇区号（低8位，端口 0x1F3）
-    inc dx           ; 0x1F3 = LBA 低8位寄存器
-    mov al, cl       ; AL = LBA[7:0]（ECX 低8位）
+    ; --------------------------
+    ; 2. 写入 LBA 地址（28位，分4个端口写入）
+    ; --------------------------
+    ; LBA [7:0]（低8位）→ 端口 0x1F3
+    inc dx           ; dx = 0x1F3（LBA 低8位寄存器）
+    mov al, cl       ; AL = LBA 低8位（ECX 的最低字节）
     out dx, al
 
-    ; 3. 设置 LBA 扇区号（中8位，端口 0x1F4）
-    inc dx           ; 0x1F4 = LBA 中8位寄存器
-    mov al, ch       ; AL = LBA[15:8]（ECX 中8位）
+    ; LBA [15:8]（中8位）→ 端口 0x1F4
+    inc dx           ; dx = 0x1F4（LBA 中8位寄存器）
+    mov al, ch       ; AL = LBA 中8位（ECX 的次低字节）
     out dx, al
 
-    ; 4. 设置 LBA 扇区号（高8位，端口 0x1F5）
-    inc dx           ; 0x1F5 = LBA 高8位寄存器
-    shr ecx, 16      ; ECX 右移16位，提取 LBA[23:16]
-    mov al, cl       ; AL = LBA[23:16]
+    ; LBA [23:16]（高8位）→ 端口 0x1F5
+    inc dx           ; dx = 0x1F5（LBA 高8位寄存器）
+    shr ecx, 16      ; ECX 右移16位，提取 LBA [23:16]（高8位）
+    mov al, cl       ; AL = LBA 高8位（ECX 右移后的低字节）
     out dx, al
 
-    ; 5. 设置驱动器/头部（端口 0x1F6）：主盘 + LBA 模式 + LBA[27:24]
-    inc dx           ; 0x1F6 = 驱动器/头部寄存器
-    shr ecx, 8       ; ECX 右移8位，提取 LBA[27:24]
-    or al, 0xE0      ; 0xE0 = 11100000B（主盘 | LBA 模式）
-    out dx, al
+    ; LBA [27:24] + 驱动器选择 → 端口 0x1F6
+    inc dx           ; dx = 0x1F6（驱动器/头部寄存器）
+    shr ecx, 8       ; ECX 再右移8位，提取 LBA [27:24]（最高4位）
+    or al, 0xE0      ; 0xE0 = 11100000B：bit7=1（主盘）、bit6=1（LBA模式）、bit5=1（固定）
+    out dx, al       ; 告知硬盘：主盘、LBA模式、LBA 最高4位
 
-    ; 6. 发送读命令（端口 0x1F7）
-    inc dx           ; 0x1F7 = 命令/状态寄存器
-    mov al, 0x20     ; 0x20 = 读扇区命令（无重试）
-    out dx, al
+    ; --------------------------
+    ; 3. 发送读命令（IDE 端口 0x1F7）
+    ; --------------------------
+    inc dx           ; dx = 0x1F7（命令/状态寄存器）
+    mov al, 0x20     ; 0x20 = 读扇区命令（无重试，BIOS 常用命令）
+    out dx, al       ; 发送命令，硬盘开始读取
 
-    ; 7. 等待硬盘就绪（检查状态寄存器）
-    call .wait_ready
+    ; --------------------------
+    ; 4. 等待硬盘就绪（轮询状态寄存器）
+    ; --------------------------
+    call .wait_ready ; 调用等待就绪函数，直到硬盘空闲且数据就绪
 
-    ; 8. 读取数据到内存（目标地址 0x1200，每次读2字节）
-    mov di, KERNEL_ADDR   ; DI = 目标内存地址（内核加载地址）
-
+    ; --------------------------
+    ; 5. 读取数据到内存（0x5C00）
+    ; --------------------------
+    ; 设置loop次数，读多少个扇区要loop多少次
     mov cl, bl
-    xchg bx,bx
-    xchg bx,bx
-
 .start_read:
-    push cx
+    push cx     ; 保存loop次数，防止被下面的代码修改破坏
+
     call .wait_ready
-    call .read_hd
-    pop cx
+    call read_hd_data
+
+    pop cx      ; 恢复loop次数
+
     loop .start_read
+
 .return:
     ret
 
-.read_hd:
+; ==============================================================================
+; 子函数2：等待硬盘就绪（辅助 .lba_read 函数）
+; 功能：轮询 IDE 状态寄存器，直到硬盘空闲且数据就绪
+; 原理：状态寄存器（0x1F7）bit7=1（忙）、bit3=1（数据就绪）
+; ==============================================================================
+.wait_ready:
+    mov dx, 0x1F7    ; dx = 0x1F7（命令/状态寄存器）
+
+.wait_loop:
+    in al, dx        ; 读取状态寄存器值到 AL
+    test al, 0x80    ; 检查 bit7（忙标志）：1=忙，0=空闲
+    jnz .wait_loop   ; 忙 → 继续等待
+    test al, 0x08    ; 检查 bit3（数据就绪标志）：1=就绪，0=未就绪
+    jz .wait_loop    ; 未就绪 → 继续等待
+    ret              ; 就绪 → 返回调用者
+
+; 读硬盘，一次读两个字节，读256次，刚好读一个扇区
+read_hd_data:
+    mov dx, 0x1f0
     mov cx, 256
-    mov dx, 0x1F0    ; 0x1F0 = 数据端口（双向）
 
 .read_word:
     in ax, dx
     mov [edi], ax
     add edi, 2
     loop .read_word
-
     ret
-
-; ==============================================================================
-; 子函数4：等待硬盘就绪（辅助 .lba_read 函数）
-; 功能：检查 IDE 硬盘状态寄存器，直到硬盘空闲且数据就绪
-; ==============================================================================
-.wait_ready:
-    mov dx, 0x1F7    ; 0x1F7 = 命令/状态寄存器
-
-.wait_loop:
-    in al, dx        ; 读取状态寄存器
-    test al, 0x80    ; 检查忙标志（第7位：1=忙，0=空闲）
-    jnz .wait_loop   ; 忙 → 继续等待
-
-    test al, 0x08    ; 检查数据就绪标志（第3位：1=就绪，0=未就绪）
-    jz .wait_loop    ; 未就绪 → 继续等待
-
-    ret   ; 就绪 → 返回
-
 
 ; ==============================================================================
 ; 子函数5：BIOS 打印字符串（实模式下用 0x10 中断）
