@@ -36,15 +36,16 @@ _start:
     ; 向从发送ICW4
     out 0A1h, al
 
-    ; 屏蔽所有中断，只接收键盘中断
+; 屏蔽主片除键盘中断外的所有中断
 .enable_8259a_main:
-    mov al, 11111110b
-    out 21h, al
+    mov al, 11111101b  ; 中断屏蔽寄存器（IMR）值：每一位对应一个IRQ，1=屏蔽，0=允许
+                       ; 第1位=0（IRQ1，键盘中断），其余位=1（屏蔽）
+    out 21h, al        ; 写入主片IMR
 
-    ; 屏蔽从芯片所有中断响应
+; 屏蔽从片所有中断
 .disable_8259a_slave:
-    mov al, 11111111b
-    out 0A1h, al
+    mov al, 11111111b  ; 从片IMR：所有位=1（屏蔽所有IRQ8-IRQ15）
+    out 0A1h, al       ; 写入从片IMR
 
     ; 调用c程序
 .enter_c_word:

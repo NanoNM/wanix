@@ -85,7 +85,6 @@ _start:
     ; 5. 读取数据到内存（0x5C00）
     ; --------------------------
     ; 设置loop次数，读多少个扇区要loop多少次
-    xchg bx,bx
     xor cx,cx
     mov cl, bl
 .start_read:

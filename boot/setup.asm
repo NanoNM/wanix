@@ -116,8 +116,6 @@ setup_start:
     mov eax, cr0
     or eax, 1          ; PE 位 = 1（Protection Enable，保护模式使能）
     mov cr0, eax
-    XCHG BX, BX
-    XCHG BX, BX
 
     ; 进入32位保护模式 不用显式将代码段复制给cs
     call GDT_CODE_SEGMENT:enter_protected_mod

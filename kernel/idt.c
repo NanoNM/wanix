@@ -1,0 +1,56 @@
+//
+// Created by wang on 25-10-1.
+//
+#include "../include/asm/system.h"
+#include "../include/wanux/kernel.h"
+#include "../include/wanux/traps.h"
+
+#include "../include/string.h"
+
+#define INTERRUPT_TABLE_SIZE    256
+interrupt_gate_t interrupt_table[INTERRUPT_TABLE_SIZE] = {0};
+xdt_ptr_t idt_ptr;
+
+extern void interrupt_handler_entry();
+extern void keymap_handler_entry();
+
+void idt_init(){
+    printk("idt init...\n");
+
+    for (int i = 0; i < INTERRUPT_TABLE_SIZE; ++i) {
+        interrupt_gate_t* p = &interrupt_table[i];
+
+        // int handler = (int)interrupt_handler_entry;
+        int handler = (int)interrupt_handler_entry;
+
+        // if (i <= 0x15) {
+        //     handler = (int)interrupt_handler_table[i];
+        // }
+        //
+        // if (0x20 == i) {
+        //     handler = (int)clock_handler_entry;
+        // }
+        //
+        if (0x21 == i) {
+            handler = (int)keymap_handler_entry;
+        }
+        //
+        // if (0x80 == i) {
+        //     handler = system_call_entry;
+        // }
+
+        p->offset0 = handler & 0xffff;
+        p->offset1 = (handler >> 16) & 0xffff;
+        p->selector = 1 << 3;
+        p->reserved = 0;      // 保留不用
+        p->type = 0b1110;     // 中断门
+        p->segment = 0;       // 系统段
+        p->DPL = (0x80 == i)? 3 : 0;
+        p->present = 1;       // 有效
+    }
+
+    write_xdt_ptr(&idt_ptr, INTERRUPT_TABLE_SIZE * 8, (int)interrupt_table);
+    asm volatile("lidt idt_ptr;");
+
+    printk("idt init finished\n");
+}

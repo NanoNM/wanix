@@ -63,8 +63,8 @@ $(KERNEL_O): $(KERNEL_SRC)  | $(BUILDPATH)
 
 
 # 内核编译
-$(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/printk.o  ${BUILDPATH}/kernel/asm/io.o \
-	${BUILDPATH}/kernel/vfprintf.o\
+$(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/chr_drv/easy_keybord.o ${BUILDPATH}/kernel/printk.o  ${BUILDPATH}/kernel/asm/io.o ${BUILDPATH}/kernel/asm/interrupt_handler.o\
+	${BUILDPATH}/kernel/vfprintf.o ${BUILDPATH}/kernel/gdt.o ${BUILDPATH}/kernel/idt.o ${BUILDPATH}/kernel/traps.o\
 	${BUILDPATH}/lib/string.o  ${BUILDPATH}/lib/stdio.o  ${BUILDPATH}/lib/stdlib.o ${BUILDPATH}/lib/unistd.o ${BUILDPATH}/lib/write.o  ${BUILDPATH}/lib/error.o        | $(BUILDPATH)
 	ld -m elf_i386 -g $^ -o $(KERNEL_BIN) -Ttext 0x1200
 
@@ -78,6 +78,10 @@ ${BUILDPATH}/kernel/%.o:./kernel/%.c
 	gcc ${CFLAGS} ${DEBUG} -c $< -o $@
 
 ${BUILDPATH}/kernel/asm/io.o: ./kernel/asm/io.asm | $(BUILDPATH)
+	mkdir -p ${BUILDPATH}/kernel/asm
+	$(NASM) -f elf32 -g $< -o $@
+
+${BUILDPATH}/kernel/asm/interrupt_handler.o: ./kernel/asm/interrupt_handler.asm | $(BUILDPATH)
 	mkdir -p ${BUILDPATH}/kernel/asm
 	$(NASM) -f elf32 -g $< -o $@
 
@@ -145,7 +149,7 @@ run_bochs: clean $(DISK_IMG)
 	fi
 
 	@echo "启动bochs模拟器..."
-	~/bochs-2.7/bochs -q -f boch.config  # 使用硬盘模式
+	~/apps/bochs-2.7/bochs -q -f boch.config  # 使用硬盘模式
 
 run_bochs_ng: clean $(DISK_IMG)
 # 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
@@ -157,7 +161,7 @@ run_bochs_ng: clean $(DISK_IMG)
 	fi
 
 	@echo "启动bochs模拟器..."
-	~/bochs-2.7/bochs -q -f bochng.config  # 使用硬盘模式
+	~/bochs/bin/bochs -q -f bochng.config  # 使用硬盘模式
 
 # 单独编译目标
 boot: $(BOOT_BIN)

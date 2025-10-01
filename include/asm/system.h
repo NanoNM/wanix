@@ -11,11 +11,10 @@
 
 #define BOCHS_DEBUG_MAGIC   __asm__("xchg bx, bx");
 
-//TODO 暂时没有中断向量表暂时不需要开关中断
-// #define STI   __asm__("sti");
-#define STI   __asm__("");
-// #define CLI   __asm__("cli");
-#define CLI   __asm__("");
+#define STI   __asm__("sti");
+// #define STI   __asm__("");
+#define CLI   __asm__("cli");
+// #define CLI   __asm__("");
 
 typedef enum {
     rc_black = 0,
@@ -35,5 +34,11 @@ typedef enum {
     rc_light_brown = 14,
     rc_white = 15
 } real_color_t;
+
+
+
+#define OSNAME "wanux"
+#define OSVERSION "0.0.0.a"
+#define ARDS_ADDR 0x1100
 
 #endif //WANG_OSKERNEL_TEACH_COMMON_H
