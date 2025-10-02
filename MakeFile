@@ -63,7 +63,8 @@ $(KERNEL_O): $(KERNEL_SRC)  | $(BUILDPATH)
 
 
 # 内核编译
-$(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/chr_drv/easy_keybord.o ${BUILDPATH}/kernel/printk.o  ${BUILDPATH}/kernel/asm/io.o ${BUILDPATH}/kernel/asm/interrupt_handler.o\
+$(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/chr_drv/easy_keybord.o ${BUILDPATH}/kernel/chr_drv/clock.o\
+	${BUILDPATH}/kernel/printk.o  ${BUILDPATH}/kernel/asm/io.o ${BUILDPATH}/kernel/asm/interrupt_handler.o ${BUILDPATH}/kernel/asm/clock_interrupt_handler.o\
 	${BUILDPATH}/kernel/vfprintf.o ${BUILDPATH}/kernel/gdt.o ${BUILDPATH}/kernel/idt.o ${BUILDPATH}/kernel/traps.o\
 	${BUILDPATH}/lib/string.o  ${BUILDPATH}/lib/stdio.o  ${BUILDPATH}/lib/stdlib.o ${BUILDPATH}/lib/unistd.o ${BUILDPATH}/lib/write.o  ${BUILDPATH}/lib/error.o        | $(BUILDPATH)
 	ld -m elf_i386 -g $^ -o $(KERNEL_BIN) -Ttext 0x1200
@@ -82,6 +83,10 @@ ${BUILDPATH}/kernel/asm/io.o: ./kernel/asm/io.asm | $(BUILDPATH)
 	$(NASM) -f elf32 -g $< -o $@
 
 ${BUILDPATH}/kernel/asm/interrupt_handler.o: ./kernel/asm/interrupt_handler.asm | $(BUILDPATH)
+	mkdir -p ${BUILDPATH}/kernel/asm
+	$(NASM) -f elf32 -g $< -o $@
+
+${BUILDPATH}/kernel/asm/clock_interrupt_handler.o: ./kernel/asm/clock_interrupt_handler.asm | $(BUILDPATH)
 	mkdir -p ${BUILDPATH}/kernel/asm
 	$(NASM) -f elf32 -g $< -o $@
 
