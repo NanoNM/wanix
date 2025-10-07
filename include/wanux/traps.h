@@ -7,6 +7,7 @@
 
 void gdt_init();
 void idt_init();
+// void clock_init();
 
 void send_eoi(int idt_index);
 

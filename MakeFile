@@ -66,6 +66,7 @@ $(KERNEL_O): $(KERNEL_SRC)  | $(BUILDPATH)
 $(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/chr_drv/easy_keybord.o ${BUILDPATH}/kernel/chr_drv/clock.o\
 	${BUILDPATH}/kernel/printk.o  ${BUILDPATH}/kernel/asm/io.o ${BUILDPATH}/kernel/asm/interrupt_handler.o ${BUILDPATH}/kernel/asm/clock_interrupt_handler.o\
 	${BUILDPATH}/kernel/vfprintf.o ${BUILDPATH}/kernel/gdt.o ${BUILDPATH}/kernel/idt.o ${BUILDPATH}/kernel/traps.o\
+	${BUILDPATH}/mm/memory.o\
 	${BUILDPATH}/lib/string.o  ${BUILDPATH}/lib/stdio.o  ${BUILDPATH}/lib/stdlib.o ${BUILDPATH}/lib/unistd.o ${BUILDPATH}/lib/write.o  ${BUILDPATH}/lib/error.o        | $(BUILDPATH)
 	ld -m elf_i386 -g $^ -o $(KERNEL_BIN) -Ttext 0x1200
 
@@ -97,6 +98,10 @@ ${BUILDPATH}/kernel/asm/clock_interrupt_handler.o: ./kernel/asm/clock_interrupt_
 ${BUILDPATH}/lib/%.o: ./lib/%.c
 	mkdir -p ${BUILDPATH}/lib
 	gcc ${CFLAGS} -g -c $< -o $@
+
+${BUILDPATH}/mm/%.o:./mm/%.c
+	mkdir -p ${BUILDPATH}/mm
+	gcc ${CFLAGS} ${DEBUG} -c $< -o $@
 
 ${BUILDPATH}/init/main.o: ./init/main.c
 	mkdir -p ${BUILDPATH}/init/
