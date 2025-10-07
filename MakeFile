@@ -124,7 +124,7 @@ $(DISK_IMG): $(BOOT_BIN) $(SETUP_BIN) $(SYSTEM_BIN)
 	# 写入setup程序(第二个扇区)
 	$(DD) if=$(SETUP_BIN) of=$(DISK_IMG) bs=512 seek=1 count=2 conv=notrunc
 	# 写入内核
-	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=3 count=60 conv=notrunc
+	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=3 count=200 conv=notrunc
 	@echo "磁盘镜像创建完成: $(DISK_IMG)"
 
 

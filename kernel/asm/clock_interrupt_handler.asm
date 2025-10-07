@@ -7,8 +7,13 @@ extern clock_handler
 ;时钟中断信号入口函数
 global clock_interrupt_handler_entry
 clock_interrupt_handler_entry:
+
+.call_handler:
     push 0x20
     call clock_handler
     add esp, 4
 
     iret
+
+msg:
+    db "clock_handler", 10, 0

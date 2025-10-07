@@ -1,11 +1,8 @@
 //
 // Created by wang on 25-10-1.
 //
-#include "../include/asm/system.h"
 #include "../include/wanux/kernel.h"
 #include "../include/wanux/traps.h"
-
-#include "../include/string.h"
 
 #define INTERRUPT_TABLE_SIZE    256
 interrupt_gate_t interrupt_table[INTERRUPT_TABLE_SIZE] = {0};
@@ -21,7 +18,6 @@ void idt_init(){
     for (int i = 0; i < INTERRUPT_TABLE_SIZE; ++i) {
         interrupt_gate_t* p = &interrupt_table[i];
 
-        // int handler = (int)interrupt_handler_entry;
         int handler = (int)interrupt_handler_entry;
 
         // if (i <= 0x15) {
