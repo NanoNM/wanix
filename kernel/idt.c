@@ -16,7 +16,7 @@ extern void keymap_handler_entry();
 extern void clock_interrupt_handler_entry();
 
 void idt_init(){
-    printk("idt init...\n");
+    printk("init idt...\n");
 
     for (int i = 0; i < INTERRUPT_TABLE_SIZE; ++i) {
         interrupt_gate_t* p = &interrupt_table[i];
@@ -53,5 +53,5 @@ void idt_init(){
     write_xdt_ptr(&idt_ptr, INTERRUPT_TABLE_SIZE * 8, (int)interrupt_table);
     asm volatile("lidt idt_ptr;");
 
-    printk("idt init finished\n");
+    printk("init idt finished\n");
 }
