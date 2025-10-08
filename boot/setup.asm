@@ -182,7 +182,7 @@ enter_protected_mod:
     mov esp, 0x9fbff
     mov edi, KERNEL_ADDR
     mov ecx, 3         ; LBA 扇区号 = 2（内核存储起始扇区）
-    mov bl, 200         ; 读取扇区数 = 100（内核大小对应100个扇区）
+    mov bl, 100         ; 读取扇区数 = 100（内核大小对应100个扇区）
     call .lba_read     ; 调用 LBA 读硬盘函数
 
     ;跳转到载入位置

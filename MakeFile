@@ -147,7 +147,7 @@ run_qume:clean $(DISK_IMG)
 		echo "未发现锁文件，无需删除"; \
 	fi
 	@echo "启动QEMU模拟器..."
-	$(QEMU) -m 64M -hda $(DISK_IMG)  -net nic,model=ne2k_pci  # 使用硬盘模式
+	$(QEMU) -m 128M -hda $(DISK_IMG)  -net nic,model=ne2k_pci  # 使用硬盘模式
 
 run_bochs: clean $(DISK_IMG)
 # 检测锁文件是否存在，存在则删除（-f 确保不存在时不报错）
