@@ -10,6 +10,10 @@
 ; ==============================================================================
 [SECTION .setup_data]
 KERNEL_ADDR equ 0x1200
+
+B8000_SEG_BASE equ 0xb8000
+B8000_SEG_LIMIT equ 0x7fff
+
 ; --------------------------
 ; 内存检测相关常量/变量
 ; --------------------------
@@ -24,6 +28,7 @@ SEGLIMIT          equ 0xfffff ; 段限长（4KB粒度下对应 4GB 内存）
 BASEADDR          equ 0x0     ; 段基地址（从 0x0 开始）
 GDT_CODE_SEGMENT  equ (1 << 3); 代码段选择子（索引1，RPL=0）
 GDT_DATA_SEGMENT  equ (2 << 3); 数据段选择子（索引2，RPL=0）
+B8000_SELECTOR equ (3 << 3)
 
 ; GDT 表实体（共3个描述符：空描述符、代码段、数据段）
 gdt_header:       ; 空描述符（必须存在，占位用）

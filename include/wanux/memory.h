@@ -4,6 +4,9 @@
 
 #ifndef MEMORY_H
 #define MEMORY_H
+
+#define PAGE_SIZE 0x1000
+
 typedef struct {
     uint  base_addr_low;    //内存基地址的低32位
     uint  base_addr_high;   //内存基地址的高32位
@@ -45,4 +48,7 @@ void mem_init();
 void mem_map_init();
 void* get_free_page();
 void free_page(void* p);
+
+
+void* virtual_memory_init();
 #endif //MEMORY_H

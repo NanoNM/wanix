@@ -11,4 +11,6 @@ add_executable(helloworld helloworld/helloworld.c
         kernel/chr_drv/clock.c
         mm/memory.c
         include/wanux/memory.h
+        mm/mm_101012.c
+        kernel/kernel.c
 )

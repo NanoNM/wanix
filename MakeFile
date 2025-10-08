@@ -65,7 +65,7 @@ $(KERNEL_O): $(KERNEL_SRC)  | $(BUILDPATH)
 # 内核编译
 $(KERNEL_BIN): $(KERNEL_O) ${BUILDPATH}/init/main.o ${BUILDPATH}/kernel/chr_drv/console.o ${BUILDPATH}/kernel/chr_drv/easy_keybord.o ${BUILDPATH}/kernel/chr_drv/clock.o\
 	${BUILDPATH}/kernel/printk.o  ${BUILDPATH}/kernel/asm/io.o ${BUILDPATH}/kernel/asm/interrupt_handler.o ${BUILDPATH}/kernel/asm/clock_interrupt_handler.o\
-	${BUILDPATH}/kernel/vfprintf.o ${BUILDPATH}/kernel/gdt.o ${BUILDPATH}/kernel/idt.o ${BUILDPATH}/kernel/traps.o\
+	${BUILDPATH}/kernel/kernel.o ${BUILDPATH}/kernel/vfprintf.o ${BUILDPATH}/kernel/gdt.o ${BUILDPATH}/kernel/idt.o ${BUILDPATH}/kernel/traps.o\
 	${BUILDPATH}/mm/memory.o\
 	${BUILDPATH}/lib/string.o  ${BUILDPATH}/lib/stdio.o  ${BUILDPATH}/lib/stdlib.o ${BUILDPATH}/lib/unistd.o ${BUILDPATH}/lib/write.o  ${BUILDPATH}/lib/error.o        | $(BUILDPATH)
 	ld -m elf_i386 -g $^ -o $(KERNEL_BIN) -Ttext 0x1200
@@ -124,7 +124,7 @@ $(DISK_IMG): $(BOOT_BIN) $(SETUP_BIN) $(SYSTEM_BIN)
 	# 写入setup程序(第二个扇区)
 	$(DD) if=$(SETUP_BIN) of=$(DISK_IMG) bs=512 seek=1 count=2 conv=notrunc
 	# 写入内核
-	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=3 count=200 conv=notrunc
+	$(DD) if=$(SYSTEM_BIN) of=$(DISK_IMG) bs=512 seek=3 count=100 conv=notrunc
 	@echo "磁盘镜像创建完成: $(DISK_IMG)"
 
 

@@ -70,7 +70,7 @@ void mem_map_init() {
     }
     // 清零字节图
     // memset(g_physics_memory_map.map, 0, g_physics_memory_map.pages_total);
-    printk("maper_mem finished!\n");
+    printk("mapper_mem finished!\n");
 
 
 }
@@ -115,7 +115,7 @@ void* get_free_page() {
 }
 
 void free_page(void* p) {
-    if (p < g_physics_memory.addr_start_low || p > g_physics_memory.addr_end_low) {
+    if (p < (void*)g_physics_memory.addr_start_low || p > (void*)g_physics_memory.addr_end_low) {
         printk("invalid address!");
         return;
     }
@@ -136,6 +136,9 @@ void free_page(void* p) {
     printk("[%s]return: 0x%X, used: %d pages\n", __FUNCTION__, p, g_physics_memory_map.bitmap_item_used);
 
 }
+
+
+
 
 // 字节图
 // void* get_free_page() {
